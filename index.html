@@ -1352,6 +1352,15 @@ async function payAndStart() {
   status.textContent = '⏳ Waiting for wallet confirmation...';
 
   try {
+    // Clear any stale active session first
+    const existingSession = await contract.activeSession(userAddress);
+    if (existingSession.toString() !== '0') {
+      status.textContent = '⏳ Clearing previous session...';
+      const abandonTx = await contract.abandonSession();
+      await abandonTx.wait();
+      status.textContent = '⏳ Previous session cleared. Registering...';
+    }
+
     const tx = await contract.registerSession(discordName, {
       value: ethers.utils.parseEther(ENTRY_FEE)
     });
