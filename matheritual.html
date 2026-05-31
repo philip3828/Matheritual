@@ -1,0 +1,1788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matheritual — Math on the Ritual Network</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&family=Orbitron:wght@400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+<style>
+  :root {
+    --g0: #0a1a0a;
+    --g1: #0d2410;
+    --g2: #0f2d12;
+    --g3: #163d18;
+    --g4: #1a4d1c;
+    --g5: #1f6023;
+    --g6: #27772c;
+    --g7: #2e8f34;
+    --g8: #38b041;
+    --g9: #45d450;
+    --ga: #5eff6a;
+    --gb: #8fffa0;
+    --gc: #c0ffcc;
+    --gold: #f7c948;
+    --amber: #ffaa00;
+    --red: #ff4444;
+    --white: #f0fff2;
+    --dim: rgba(45,212,52,0.12);
+    --glow: 0 0 30px rgba(69,212,80,0.4), 0 0 60px rgba(69,212,80,0.15);
+    --glow-sm: 0 0 12px rgba(69,212,80,0.5);
+    --font-display: 'Orbitron', monospace;
+    --font-body: 'Syne', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; min-height: 100vh;
+    background: var(--g0);
+    color: var(--white);
+    font-family: var(--font-body);
+    overflow-x: hidden;
+  }
+
+  /* ── BACKGROUND ─────────────────────────────── */
+  #bg-canvas {
+    position: fixed; inset: 0; z-index: 0;
+    pointer-events: none;
+  }
+
+  .bg-overlay {
+    position: fixed; inset: 0; z-index: 1;
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 10%, rgba(39,119,44,0.35) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 80% 80%, rgba(15,45,18,0.9) 0%, transparent 70%),
+      radial-gradient(ellipse 100% 100% at 50% 50%, rgba(10,26,10,0.5) 0%, transparent 100%);
+    pointer-events: none;
+  }
+
+  /* ── LAYOUT ─────────────────────────────────── */
+  #app {
+    position: relative; z-index: 2;
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px 16px;
+  }
+
+  /* ── HEADER ─────────────────────────────────── */
+  .site-header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 32px;
+    background: rgba(10,26,10,0.7);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(94,255,106,0.12);
+  }
+
+  .logo {
+    font-family: var(--font-display);
+    font-size: 1.25rem; font-weight: 900;
+    letter-spacing: 0.08em;
+    background: linear-gradient(135deg, var(--g9) 0%, var(--ga) 50%, var(--gold) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    text-shadow: none;
+    filter: drop-shadow(0 0 8px rgba(69,212,80,0.6));
+  }
+
+  .header-right { display: flex; align-items: center; gap: 12px; }
+
+  .music-btn {
+    background: rgba(94,255,106,0.08);
+    border: 1px solid rgba(94,255,106,0.25);
+    color: var(--ga);
+    padding: 8px 14px; border-radius: 8px;
+    cursor: pointer; font-family: var(--font-mono); font-size: 0.75rem;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .music-btn:hover { background: rgba(94,255,106,0.15); box-shadow: var(--glow-sm); }
+  .music-btn .icon { font-size: 1rem; }
+
+  .wallet-pill {
+    background: rgba(94,255,106,0.1);
+    border: 1px solid rgba(94,255,106,0.3);
+    color: var(--ga);
+    padding: 8px 16px; border-radius: 100px;
+    font-family: var(--font-mono); font-size: 0.75rem;
+    display: flex; align-items: center; gap: 8px;
+    transition: all 0.2s;
+  }
+  .wallet-pill .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--ga);
+    box-shadow: 0 0 6px var(--ga);
+    animation: pulse-dot 2s infinite;
+  }
+  @keyframes pulse-dot { 0%,100%{opacity:1}50%{opacity:0.4} }
+
+  /* ── SCREENS ─────────────────────────────────── */
+  .screen {
+    display: none;
+    width: 100%; max-width: 560px;
+    animation: fadeUp 0.5s ease forwards;
+    margin-top: 72px;
+  }
+  .screen.active { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── CARD ─────────────────────────────────────── */
+  .card {
+    width: 100%;
+    background: linear-gradient(145deg, rgba(15,45,18,0.85) 0%, rgba(13,36,16,0.95) 100%);
+    border: 1px solid rgba(94,255,106,0.18);
+    border-radius: 20px;
+    padding: 32px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(94,255,106,0.1);
+    backdrop-filter: blur(12px);
+    position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(94,255,106,0.5), transparent);
+  }
+
+  /* ── WELCOME ─────────────────────────────────── */
+  .hero-title {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 6vw, 3.2rem);
+    font-weight: 900; letter-spacing: 0.05em;
+    text-align: center; line-height: 1.1;
+    background: linear-gradient(135deg, #45d450 0%, #5eff6a 40%, #f7c948 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 20px rgba(69,212,80,0.5));
+    margin-bottom: 6px;
+  }
+  .hero-sub {
+    font-family: var(--font-mono); font-size: 0.8rem;
+    color: rgba(94,255,106,0.6); letter-spacing: 0.15em;
+    text-align: center; margin-bottom: 32px;
+  }
+
+  .section-label {
+    font-family: var(--font-mono); font-size: 0.7rem;
+    color: rgba(94,255,106,0.5); letter-spacing: 0.2em;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+
+  /* ── INPUTS ─────────────────────────────────── */
+  input[type="text"] {
+    width: 100%;
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(94,255,106,0.2);
+    color: var(--white); font-family: var(--font-mono); font-size: 0.9rem;
+    padding: 12px 16px; border-radius: 10px;
+    outline: none; transition: all 0.2s;
+  }
+  input[type="text"]:focus {
+    border-color: rgba(94,255,106,0.6);
+    box-shadow: 0 0 0 3px rgba(94,255,106,0.1);
+  }
+  input[type="text"]::placeholder { color: rgba(94,255,106,0.25); }
+
+  /* ── BUTTONS ─────────────────────────────────── */
+  .btn {
+    width: 100%; padding: 14px 24px;
+    border: none; border-radius: 12px; cursor: pointer;
+    font-family: var(--font-display); font-size: 0.85rem;
+    font-weight: 700; letter-spacing: 0.12em;
+    transition: all 0.25s; position: relative; overflow: hidden;
+  }
+  .btn::after {
+    content: ''; position: absolute; inset: 0;
+    background: rgba(255,255,255,0.1);
+    transform: translateY(100%); transition: transform 0.2s;
+  }
+  .btn:hover::after { transform: translateY(0); }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--g7) 0%, var(--g9) 100%);
+    color: #000;
+    box-shadow: 0 4px 20px rgba(69,212,80,0.35);
+  }
+  .btn-primary:hover { box-shadow: var(--glow); transform: translateY(-1px); }
+  .btn-primary:disabled {
+    opacity: 0.4; cursor: not-allowed; transform: none;
+    box-shadow: none;
+  }
+
+  .btn-gold {
+    background: linear-gradient(135deg, #c89420 0%, var(--gold) 100%);
+    color: #000;
+    box-shadow: 0 4px 20px rgba(247,201,72,0.35);
+    font-size: 1rem;
+  }
+  .btn-gold:hover { box-shadow: 0 0 30px rgba(247,201,72,0.5); transform: translateY(-1px); }
+
+  .btn-danger {
+    background: rgba(255,68,68,0.15);
+    border: 1px solid rgba(255,68,68,0.35);
+    color: #ff7777;
+  }
+  .btn-danger:hover { background: rgba(255,68,68,0.25); }
+
+  .btn-outline {
+    background: transparent;
+    border: 1px solid rgba(94,255,106,0.3);
+    color: var(--ga);
+  }
+  .btn-outline:hover { background: rgba(94,255,106,0.08); }
+
+  /* ── INFO ROWS ───────────────────────────────── */
+  .info-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid rgba(94,255,106,0.08);
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-key { color: rgba(94,255,106,0.5); font-size: 0.8rem; font-family: var(--font-mono); }
+  .info-val { color: var(--white); font-size: 0.85rem; font-family: var(--font-mono); font-weight: 700; }
+  .info-val.green { color: var(--ga); }
+  .info-val.gold { color: var(--gold); }
+
+  /* ── QUIZ SCREEN ─────────────────────────────── */
+  .quiz-header {
+    width: 100%; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .tier-badge {
+    font-family: var(--font-display); font-size: 0.65rem; font-weight: 700;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    padding: 5px 14px; border-radius: 100px;
+    background: rgba(94,255,106,0.12);
+    border: 1px solid rgba(94,255,106,0.3);
+    color: var(--ga);
+    transition: all 0.4s;
+  }
+
+  .score-display {
+    text-align: right;
+  }
+  .score-label { font-family: var(--font-mono); font-size: 0.65rem; color: rgba(94,255,106,0.5); letter-spacing: 0.1em; }
+  .score-val {
+    font-family: var(--font-display); font-size: 1.4rem; font-weight: 900;
+    color: var(--gold);
+    filter: drop-shadow(0 0 8px rgba(247,201,72,0.4));
+  }
+
+  .streak-bar {
+    width: 100%; display: flex; align-items: center; gap: 8px;
+  }
+  .streak-label { font-family: var(--font-mono); font-size: 0.65rem; color: rgba(94,255,106,0.5); white-space: nowrap; }
+  .streak-icons { display: flex; gap: 3px; flex-wrap: wrap; }
+  .streak-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: rgba(94,255,106,0.15);
+    border: 1px solid rgba(94,255,106,0.2);
+    transition: all 0.3s;
+  }
+  .streak-dot.lit {
+    background: var(--ga);
+    box-shadow: 0 0 6px var(--ga);
+    border-color: var(--ga);
+  }
+  .streak-dot.gold-dot {
+    background: var(--gold);
+    box-shadow: 0 0 8px var(--gold);
+    border-color: var(--gold);
+  }
+
+  /* Timer */
+  .timer-wrap {
+    width: 100%; text-align: center; position: relative;
+  }
+  .timer-ring {
+    position: relative; width: 90px; height: 90px; margin: 0 auto 8px;
+  }
+  .timer-ring svg { transform: rotate(-90deg); }
+  .timer-ring circle { transition: stroke-dashoffset 1s linear, stroke 0.5s; }
+  .timer-num {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-size: 1.6rem; font-weight: 900;
+    color: var(--ga);
+    filter: drop-shadow(0 0 8px rgba(69,212,80,0.6));
+    transition: color 0.3s;
+  }
+  .timer-num.warn { color: var(--amber); filter: drop-shadow(0 0 8px rgba(255,170,0,0.6)); }
+  .timer-num.danger { color: var(--red); filter: drop-shadow(0 0 10px rgba(255,68,68,0.7)); animation: shake 0.3s infinite; }
+  @keyframes shake {
+    0%,100%{transform:translateX(0)} 25%{transform:translateX(-2px)} 75%{transform:translateX(2px)}
+  }
+
+  /* Question */
+  .question-box {
+    width: 100%;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(94,255,106,0.15);
+    border-radius: 16px; padding: 28px 24px;
+    text-align: center;
+  }
+  .q-num { font-family: var(--font-mono); font-size: 0.7rem; color: rgba(94,255,106,0.4); letter-spacing: 0.15em; margin-bottom: 10px; }
+  .q-text {
+    font-family: var(--font-display); font-size: clamp(1.4rem, 4vw, 2rem);
+    font-weight: 700; letter-spacing: 0.03em;
+    color: var(--white);
+    filter: drop-shadow(0 0 12px rgba(94,255,106,0.25));
+  }
+
+  /* Options */
+  .options-grid {
+    width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  }
+  .opt-btn {
+    padding: 16px 12px; border-radius: 12px; cursor: pointer;
+    background: rgba(15,45,18,0.6);
+    border: 1px solid rgba(94,255,106,0.18);
+    color: var(--white); font-family: var(--font-display);
+    font-size: 0.9rem; font-weight: 600;
+    transition: all 0.18s; position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .opt-letter {
+    font-family: var(--font-mono); font-size: 0.65rem;
+    color: rgba(94,255,106,0.5);
+    background: rgba(94,255,106,0.08);
+    padding: 2px 6px; border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .opt-btn:hover:not(:disabled) {
+    background: rgba(94,255,106,0.12);
+    border-color: rgba(94,255,106,0.45);
+    box-shadow: 0 0 16px rgba(94,255,106,0.15);
+    transform: translateY(-2px);
+  }
+  .opt-btn.correct {
+    background: rgba(69,212,80,0.2);
+    border-color: var(--ga);
+    box-shadow: 0 0 20px rgba(69,212,80,0.35);
+    color: var(--ga);
+    animation: correctPop 0.4s ease;
+  }
+  .opt-btn.wrong {
+    background: rgba(255,68,68,0.15);
+    border-color: var(--red);
+    color: var(--red);
+    animation: wrongShake 0.4s ease;
+  }
+  .opt-btn:disabled { cursor: not-allowed; }
+  @keyframes correctPop {
+    0%{transform:scale(1)} 50%{transform:scale(1.05)} 100%{transform:scale(1)}
+  }
+  @keyframes wrongShake {
+    0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-4px)} 40%,80%{transform:translateX(4px)}
+  }
+
+  /* ── FLOATING FEEDBACK ───────────────────────── */
+  .feedback {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-family: var(--font-display); font-size: 2rem; font-weight: 900;
+    pointer-events: none; z-index: 200;
+    animation: feedbackAnim 0.8s ease forwards;
+  }
+  .feedback.correct { color: var(--ga); filter: drop-shadow(0 0 16px var(--ga)); }
+  .feedback.wrong { color: var(--red); filter: drop-shadow(0 0 16px var(--red)); }
+  @keyframes feedbackAnim {
+    0%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    100%{opacity:0;transform:translate(-50%,-80%) scale(1.4)}
+  }
+
+  /* ── GAME OVER / SAVE ────────────────────────── */
+  .big-score {
+    font-family: var(--font-display); font-size: clamp(3rem, 10vw, 5rem);
+    font-weight: 900; text-align: center;
+    background: linear-gradient(135deg, var(--g9), var(--gold));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 24px rgba(247,201,72,0.4));
+    animation: scoreReveal 0.6s ease;
+  }
+  @keyframes scoreReveal {
+    from{transform:scale(0.7);opacity:0} to{transform:scale(1);opacity:1}
+  }
+  .stats-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%;
+  }
+  .stat-card {
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(94,255,106,0.12);
+    border-radius: 12px; padding: 14px; text-align: center;
+  }
+  .stat-label { font-family: var(--font-mono); font-size: 0.65rem; color: rgba(94,255,106,0.4); margin-bottom: 4px; letter-spacing: 0.1em; }
+  .stat-val { font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--ga); }
+
+  /* ── TX STATUS ───────────────────────────────── */
+  .tx-status {
+    width: 100%; padding: 12px 16px; border-radius: 10px;
+    font-family: var(--font-mono); font-size: 0.75rem;
+    background: rgba(94,255,106,0.06);
+    border: 1px solid rgba(94,255,106,0.15);
+    color: rgba(94,255,106,0.7); text-align: center;
+    display: none;
+  }
+  .tx-status.show { display: block; }
+  .tx-status.error { border-color: rgba(255,68,68,0.3); color: #ff7777; background: rgba(255,68,68,0.06); }
+  .tx-status.success { border-color: rgba(94,255,106,0.4); color: var(--ga); }
+
+  /* ── LOADER SPINNER ──────────────────────────── */
+  .spinner {
+    width: 20px; height: 20px; border: 2px solid rgba(94,255,106,0.2);
+    border-top-color: var(--ga); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block; vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── BEGIN SCREEN ────────────────────────────── */
+  .begin-center { text-align: center; padding: 40px 20px; }
+  .begin-title {
+    font-family: var(--font-display); font-size: clamp(1.6rem, 5vw, 2.4rem);
+    font-weight: 900; color: var(--ga);
+    filter: drop-shadow(0 0 16px rgba(69,212,80,0.5));
+    margin-bottom: 8px;
+  }
+  .begin-sub { font-family: var(--font-mono); font-size: 0.8rem; color: rgba(94,255,106,0.5); margin-bottom: 32px; }
+
+  /* ── GLITCH EFFECT ───────────────────────────── */
+  @keyframes glitch {
+    0%,95%,100%{transform:none;opacity:1}
+    96%{transform:translate(-2px,1px);opacity:0.9}
+    97%{transform:translate(2px,-1px);opacity:0.95}
+    98%{transform:translate(-1px,2px);opacity:0.85}
+    99%{transform:translate(1px,-2px);opacity:0.9}
+  }
+  .logo { animation: glitch 8s infinite; }
+
+  /* ── PARTICLES ───────────────────────────────── */
+  .particle {
+    position: fixed; pointer-events: none; z-index: 199;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ga);
+    animation: particleFly 1s ease-out forwards;
+  }
+  @keyframes particleFly {
+    0%{opacity:1;transform:scale(1)}
+    100%{opacity:0;transform:scale(0) translate(var(--dx), var(--dy))}
+  }
+
+  /* ── PROGRESS BAR (question progress in tier) ─ */
+  .tier-progress-wrap { width: 100%; }
+  .tier-progress-bar {
+    width: 100%; height: 4px; border-radius: 2px;
+    background: rgba(94,255,106,0.08);
+    overflow: hidden;
+  }
+  .tier-progress-fill {
+    height: 100%; border-radius: 2px;
+    background: linear-gradient(90deg, var(--g7), var(--ga));
+    box-shadow: 0 0 8px var(--ga);
+    transition: width 0.5s ease;
+  }
+
+  .divider {
+    width: 100%; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(94,255,106,0.2), transparent);
+  }
+
+  /* ── CHAIN INFO BADGE ────────────────────────── */
+  .chain-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 100px;
+    background: rgba(94,255,106,0.07); border: 1px solid rgba(94,255,106,0.15);
+    font-family: var(--font-mono); font-size: 0.7rem; color: rgba(94,255,106,0.6);
+  }
+  .chain-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--ga); animation: pulse-dot 2s infinite; }
+
+  /* ── CHAIN MESSAGE ───────────────────────────── */
+  .chain-msg {
+    width: 100%; display: none;
+    align-items: center; gap: 14px;
+    padding: 16px 20px; border-radius: 14px;
+    backdrop-filter: blur(12px);
+  }
+  .chain-msg.warn {
+    background: rgba(255,170,0,0.08);
+    border: 1px solid rgba(255,170,0,0.35);
+  }
+  .chain-msg.error {
+    background: rgba(255,68,68,0.08);
+    border: 1px solid rgba(255,68,68,0.3);
+  }
+  .chain-msg-icon { font-size: 1.4rem; flex-shrink: 0; }
+  .chain-msg-title {
+    font-family: var(--font-display); font-size: 0.75rem;
+    font-weight: 700; letter-spacing: 0.12em;
+    color: var(--amber); margin-bottom: 3px;
+  }
+  .chain-msg.error .chain-msg-title { color: #ff7777; }
+  .chain-msg-sub {
+    font-family: var(--font-mono); font-size: 0.7rem;
+    color: rgba(255,255,255,0.5); line-height: 1.4;
+  }
+
+  /* ── TOAST ───────────────────────────────────── */
+  #toast {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: rgba(15,45,18,0.95); border: 1px solid rgba(94,255,106,0.3);
+    color: var(--white); font-family: var(--font-mono); font-size: 0.78rem;
+    padding: 12px 20px; border-radius: 10px; z-index: 999;
+    transition: transform 0.3s ease, opacity 0.3s ease; opacity: 0;
+    max-width: 360px; text-align: center; backdrop-filter: blur(12px);
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  #toast.error { border-color: rgba(255,68,68,0.4); }
+  #toast.warn  { border-color: rgba(255,170,0,0.4); }
+
+  /* ── RESPONSIVE ──────────────────────────────── */
+  @media(max-width: 480px) {
+    .card { padding: 20px 16px; }
+    .options-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .opt-btn { padding: 12px 8px; font-size: 0.8rem; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="bg-overlay"></div>
+<div id="toast"></div>
+
+<!-- HEADER -->
+<header class="site-header">
+  <div class="logo">MATHERITUAL</div>
+  <div class="header-right">
+    <button class="music-btn" id="musicBtn" onclick="toggleMusic()">
+      <span class="icon" id="musicIcon">♪</span>
+      <span id="musicLabel">MUTE</span>
+    </button>
+    <div class="wallet-pill" id="walletPill" style="display:none">
+      <div class="dot"></div>
+      <span id="walletAddr">0x...</span>
+    </div>
+  </div>
+</header>
+
+<div id="app">
+
+  <!-- ══ SCREEN 1: CONNECT ══ -->
+  <div class="screen active" id="screenConnect">
+    <div style="text-align:center">
+      <div class="hero-title">MATHERITUAL</div>
+      <div class="hero-sub">⬡ RITUAL NETWORK · MATH QUIZ ON-CHAIN ⬡</div>
+      <div class="chain-badge"><div class="chain-dot"></div>RITUAL CHAIN · ID 1979</div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">STEP 1 — CONNECT YOUR WALLET</div>
+      <p style="font-size:0.82rem;color:rgba(94,255,106,0.55);margin-bottom:16px;font-family:var(--font-mono)">Connect your wallet to the Ritual Network to begin your journey.</p>
+      <button class="btn btn-primary" id="connectBtn" onclick="connectWallet()">CONNECT WALLET</button>
+    </div>
+
+    <div id="chainMsg" class="chain-msg" style="display:none"></div>
+
+    <div class="card" id="discordCard" style="display:none">
+      <div class="section-label">STEP 2 — DISCORD USERNAME</div>
+      <input type="text" id="discordInput" placeholder="yourname#0001 or yourname" maxlength="40">
+    </div>
+
+    <div class="card" id="entryCard" style="display:none">
+      <div class="section-label">STEP 3 — ENTRY FEE</div>
+      <div class="info-row">
+        <span class="info-key">AMOUNT</span>
+        <span class="info-val green">0.0002 RITUAL</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">NETWORK</span>
+        <span class="info-val">RITUAL (1979)</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">PURPOSE</span>
+        <span class="info-val" style="font-size:0.75rem">GAME REGISTRATION</span>
+      </div>
+      <div style="height:20px"></div>
+      <div class="tx-status" id="txStatus"></div>
+      <div style="height:12px"></div>
+      <button class="btn btn-gold" id="payBtn" onclick="payAndStart()">PAY & REGISTER</button>
+    </div>
+  </div>
+
+  <!-- ══ SCREEN 2: BEGIN ══ -->
+  <div class="screen" id="screenBegin">
+    <div class="card">
+      <div class="begin-center">
+        <div class="begin-title">READY, MATHEMATICIAN?</div>
+        <div class="begin-sub">Registration confirmed · Gas paid · Good luck</div>
+        <div style="margin-bottom:24px">
+          <div class="info-row" style="justify-content:center;gap:24px">
+            <div style="text-align:center">
+              <div class="section-label">PLAYER</div>
+              <div style="font-family:var(--font-mono);font-size:0.85rem;color:var(--ga)" id="beginDiscord">—</div>
+            </div>
+            <div style="text-align:center">
+              <div class="section-label">CHAIN</div>
+              <div style="font-family:var(--font-mono);font-size:0.85rem;color:var(--ga)">RITUAL · 1979</div>
+            </div>
+          </div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:0.75rem;color:rgba(94,255,106,0.4);margin-bottom:28px;line-height:1.6">
+          10 TIERS · INFINITE QUESTIONS · ANSWER FAST<br>
+          MISS ONE AND IT'S OVER. SAVE YOUR SCORE ON-CHAIN.
+        </div>
+        <button class="btn btn-gold" style="font-size:1.1rem;padding:18px" onclick="beginGame()">⚡ BEGIN</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SCREEN 3: QUIZ ══ -->
+  <div class="screen" id="screenQuiz">
+    <div class="quiz-header">
+      <div>
+        <div class="tier-badge" id="tierBadge">WARM-UP</div>
+        <div style="font-family:var(--font-mono);font-size:0.65rem;color:rgba(94,255,106,0.35);margin-top:4px">Q<span id="qNum">1</span> · <span id="timeLabel">20s</span></div>
+      </div>
+      <div class="score-display">
+        <div class="score-label">SCORE</div>
+        <div class="score-val" id="scoreDisplay">0</div>
+      </div>
+    </div>
+
+    <div class="tier-progress-wrap">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span class="section-label">TIER PROGRESS</span>
+        <span class="section-label"><span id="tierQ">0</span>/5</span>
+      </div>
+      <div class="tier-progress-bar">
+        <div class="tier-progress-fill" id="tierFill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div style="width:100%;display:flex;align-items:center;gap:12px">
+      <div class="streak-label">STREAK</div>
+      <div class="streak-icons" id="streakIcons"></div>
+      <div style="margin-left:auto;font-family:var(--font-mono);font-size:0.75rem;color:var(--gold)" id="streakVal">×1.0</div>
+    </div>
+
+    <div class="timer-wrap">
+      <div class="timer-ring">
+        <svg width="90" height="90" viewBox="0 0 90 90">
+          <circle cx="45" cy="45" r="38" fill="none" stroke="rgba(94,255,106,0.1)" stroke-width="6"/>
+          <circle id="timerArc" cx="45" cy="45" r="38" fill="none"
+            stroke="var(--ga)" stroke-width="6"
+            stroke-linecap="round"
+            stroke-dasharray="238.76"
+            stroke-dashoffset="0"/>
+        </svg>
+        <div class="timer-num" id="timerNum">20</div>
+      </div>
+    </div>
+
+    <div class="question-box">
+      <div class="q-num">QUESTION <span id="qNumBig">1</span></div>
+      <div class="q-text" id="questionText">Loading...</div>
+    </div>
+
+    <div class="options-grid" id="optionsGrid"></div>
+
+    <div class="divider"></div>
+    <button class="btn btn-danger" onclick="stopGame()">■ STOP & SAVE SCORE</button>
+  </div>
+
+  <!-- ══ SCREEN 4: GAME OVER ══ -->
+  <div class="screen" id="screenOver">
+    <div style="text-align:center">
+      <div class="section-label" id="overLabel">GAME OVER</div>
+      <div class="big-score" id="finalScore">0</div>
+      <div style="font-family:var(--font-mono);font-size:0.75rem;color:rgba(94,255,106,0.4);margin-top:4px">POINTS</div>
+    </div>
+
+    <div class="card">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">QUESTIONS</div>
+          <div class="stat-val" id="statQ">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">BEST STREAK</div>
+          <div class="stat-val" id="statStreak">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">TIER REACHED</div>
+          <div class="stat-val" style="font-size:0.75rem" id="statTier">WARM-UP</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">MULTIPLIER</div>
+          <div class="stat-val" id="statMult">×1.0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">SAVE SCORE ON-CHAIN</div>
+      <div class="info-row">
+        <span class="info-key">PLAYER</span>
+        <span class="info-val green" id="saveDiscord">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">SCORE</span>
+        <span class="info-val gold" id="saveScore">0</span>
+      </div>
+      <div style="height:16px"></div>
+      <div class="tx-status" id="saveTxStatus"></div>
+      <div style="height:12px"></div>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveOnChain()">SAVE ON-CHAIN</button>
+    </div>
+
+    <button class="btn btn-outline" onclick="resetApp()">PLAY AGAIN</button>
+  </div>
+
+</div><!-- /app -->
+
+<audio id="bgMusic" loop>
+  <!-- Using AudioContext to generate procedural chiptune-style music -->
+</audio>
+
+<script>
+// ════════════════════════════════════════════════════════
+// BACKGROUND CANVAS — animated neural/particle field
+// ════════════════════════════════════════════════════════
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let W, H, nodes = [], frame = 0;
+
+function initCanvas() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  nodes = Array.from({length: 55}, () => ({
+    x: Math.random() * W, y: Math.random() * H,
+    vx: (Math.random()-0.5)*0.4, vy: (Math.random()-0.5)*0.4,
+    r: Math.random()*2+1, pulse: Math.random()*Math.PI*2
+  }));
+}
+
+function drawBg() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Hex grid background
+  ctx.strokeStyle = 'rgba(39,119,44,0.06)';
+  ctx.lineWidth = 0.5;
+  const hex = 40;
+  for (let y = -hex; y < H+hex; y += hex*0.87) {
+    for (let x = -hex; x < W+hex; x += hex*1.5) {
+      const ox = (Math.floor(y/hex/0.87)%2)*hex*0.75;
+      hexPath(ctx, x+ox, y, hex*0.44);
+      ctx.stroke();
+    }
+  }
+
+  frame++;
+  // nodes
+  nodes.forEach(n => {
+    n.x += n.vx; n.y += n.vy;
+    if (n.x < 0 || n.x > W) n.vx *= -1;
+    if (n.y < 0 || n.y > H) n.vy *= -1;
+    n.pulse += 0.02;
+    const alpha = 0.3 + Math.sin(n.pulse)*0.2;
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, n.r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(94,255,106,${alpha})`;
+    ctx.fill();
+  });
+
+  // connections
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i+1; j < nodes.length; j++) {
+      const d = Math.hypot(nodes[i].x-nodes[j].x, nodes[i].y-nodes[j].y);
+      if (d < 130) {
+        const a = (1 - d/130) * 0.12;
+        ctx.beginPath();
+        ctx.moveTo(nodes[i].x, nodes[i].y);
+        ctx.lineTo(nodes[j].x, nodes[j].y);
+        ctx.strokeStyle = `rgba(94,255,106,${a})`;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+      }
+    }
+  }
+
+  // Scan line
+  const scanY = (frame * 0.8) % (H + 100) - 50;
+  const grad = ctx.createLinearGradient(0, scanY-40, 0, scanY+40);
+  grad.addColorStop(0, 'transparent');
+  grad.addColorStop(0.5, 'rgba(94,255,106,0.03)');
+  grad.addColorStop(1, 'transparent');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, scanY-40, W, 80);
+
+  requestAnimationFrame(drawBg);
+}
+
+function hexPath(ctx, cx, cy, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI/180*(60*i-30);
+    i === 0 ? ctx.moveTo(cx+r*Math.cos(a), cy+r*Math.sin(a))
+            : ctx.lineTo(cx+r*Math.cos(a), cy+r*Math.sin(a));
+  }
+  ctx.closePath();
+}
+
+window.addEventListener('resize', initCanvas);
+initCanvas(); drawBg();
+
+// ════════════════════════════════════════════════════════
+// MUSIC — Full energetic synth engine
+// Drum machine + portamento bass + lead melody + chord stabs
+// BPM 138 — driving electronic / puzzle-game feel
+// ════════════════════════════════════════════════════════
+let audioCtx = null, musicPlaying = false, musicScheduled = false;
+let masterGain = null, loopTimeout = null;
+
+const BPM      = 138;
+const BEAT     = 60 / BPM;          // one quarter note in seconds
+const STEP     = BEAT / 4;          // one 16th note
+const LOOP_LEN = 32;                 // steps per loop (2 bars)
+
+// ── C minor pentatonic: C2 D# F G A# (great for tension)
+const NOTE = {
+  C2:65.41, Ds2:77.78, F2:87.31, G2:98.00, As2:116.54,
+  C3:130.81,Ds3:155.56,F3:174.61,G3:196.00,As3:233.08,
+  C4:261.63,Ds4:311.13,F4:349.23,G4:392.00,As4:466.16,
+  C5:523.25,Ds5:622.25,F5:698.46,G5:783.99,As5:932.33
+};
+
+// 32-step bass pattern  (null = rest)
+const BASS_PAT = [
+  NOTE.C2, null, NOTE.C2, null,  NOTE.C2, NOTE.C2, null, NOTE.Ds2,
+  NOTE.F2, null, NOTE.F2, null,  NOTE.F2, null,    NOTE.G2,null,
+  NOTE.As2,null, NOTE.As2,null,  NOTE.As2,NOTE.G2, null, NOTE.F2,
+  NOTE.G2, null, NOTE.G2, NOTE.G2, NOTE.F2,null,   NOTE.Ds2,null
+];
+
+// 32-step lead melody (null = rest)
+const LEAD_PAT = [
+  null,   NOTE.G4, null,   NOTE.G4, NOTE.As4,null,   NOTE.C5, null,
+  NOTE.Ds5,null,  NOTE.C5, null,   NOTE.As4,NOTE.G4, null,    NOTE.G4,
+  null,   NOTE.F4, NOTE.F4,null,   NOTE.Ds4,null,    NOTE.F4, NOTE.G4,
+  NOTE.As4,null,  NOTE.G4, null,   NOTE.F4, NOTE.Ds4,NOTE.F4, null
+];
+
+// Chord stab pattern — just 4 hits per bar on the offbeats
+// Each chord = array of freqs
+const CHORDS = [
+  [NOTE.C3,  NOTE.Ds3, NOTE.G3],   // Cm
+  [NOTE.F3,  NOTE.As3, NOTE.C4],   // Fm
+  [NOTE.As2, NOTE.Ds3, NOTE.G3],   // G#
+  [NOTE.G2,  NOTE.Ds3, NOTE.As3],  // Gm7
+];
+const CHORD_STEPS = [4, 12, 20, 28]; // 16th-note steps where stabs land
+
+// ── Drum patterns (1 = hit, 0 = rest, 32 steps)
+const KICK   = [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,0];
+const SNARE  = [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1];
+const HIHAT_C= [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0];
+const HIHAT_O= [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0];
+
+// ── Noise buffer cache
+let noiseBuffer = null;
+function getNoiseBuffer(ctx) {
+  if (noiseBuffer) return noiseBuffer;
+  const len = ctx.sampleRate * 0.5;
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d   = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  noiseBuffer = buf;
+  return buf;
+}
+
+// ─────────────────────────────────────────────────────────
+// LOW-LEVEL SOUND PRIMITIVES
+// ─────────────────────────────────────────────────────────
+
+function playKick(ctx, dest, t) {
+  const osc  = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const dist = ctx.createWaveShaper();
+  // Waveshaper for punch
+  const curve = new Float32Array(256);
+  for (let i = 0; i < 256; i++) curve[i] = (i/128 - 1) < 0 ? -1 : 1;
+  dist.curve = curve;
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(160, t);
+  osc.frequency.exponentialRampToValueAtTime(40, t + 0.08);
+  gain.gain.setValueAtTime(1.2, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+  osc.connect(gain); gain.connect(dest);
+  osc.start(t); osc.stop(t + 0.36);
+}
+
+function playSnare(ctx, dest, t) {
+  // Tone body
+  const osc  = ctx.createOscillator();
+  const og   = ctx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(240, t);
+  osc.frequency.exponentialRampToValueAtTime(80, t + 0.1);
+  og.gain.setValueAtTime(0.6, t);
+  og.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+  osc.connect(og); og.connect(dest);
+  osc.start(t); osc.stop(t + 0.13);
+
+  // Noise crack
+  const src  = ctx.createBufferSource();
+  const hpf  = ctx.createBiquadFilter();
+  const ng   = ctx.createGain();
+  src.buffer = getNoiseBuffer(ctx);
+  hpf.type = 'highpass'; hpf.frequency.value = 1800;
+  ng.gain.setValueAtTime(0.55, t);
+  ng.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+  src.connect(hpf); hpf.connect(ng); ng.connect(dest);
+  src.start(t); src.stop(t + 0.19);
+}
+
+function playClosedHat(ctx, dest, t) {
+  const src = ctx.createBufferSource();
+  const hpf = ctx.createBiquadFilter();
+  const g   = ctx.createGain();
+  src.buffer = getNoiseBuffer(ctx);
+  hpf.type = 'highpass'; hpf.frequency.value = 9000;
+  g.gain.setValueAtTime(0.18, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+  src.connect(hpf); hpf.connect(g); g.connect(dest);
+  src.start(t); src.stop(t + 0.045);
+}
+
+function playOpenHat(ctx, dest, t) {
+  const src = ctx.createBufferSource();
+  const hpf = ctx.createBiquadFilter();
+  const g   = ctx.createGain();
+  src.buffer = getNoiseBuffer(ctx);
+  hpf.type = 'highpass'; hpf.frequency.value = 7500;
+  g.gain.setValueAtTime(0.22, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+  src.connect(hpf); hpf.connect(g); g.connect(dest);
+  src.start(t); src.stop(t + 0.23);
+}
+
+function playBassNote(ctx, dest, freq, t, dur) {
+  const osc1 = ctx.createOscillator();
+  const osc2 = ctx.createOscillator();
+  const filt = ctx.createBiquadFilter();
+  const g    = ctx.createGain();
+
+  osc1.type = 'sawtooth'; osc1.frequency.value = freq;
+  osc2.type = 'square';   osc2.frequency.value = freq * 1.003; // slight detune
+  filt.type = 'lowpass';
+  filt.frequency.setValueAtTime(600, t);
+  filt.frequency.exponentialRampToValueAtTime(200, t + dur * 0.7);
+  filt.Q.value = 4;
+
+  g.gain.setValueAtTime(0.001, t);
+  g.gain.linearRampToValueAtTime(0.45, t + 0.008);
+  g.gain.setValueAtTime(0.45, t + dur - 0.04);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+  osc1.connect(filt); osc2.connect(filt);
+  filt.connect(g); g.connect(dest);
+  osc1.start(t); osc2.start(t);
+  osc1.stop(t + dur + 0.01); osc2.stop(t + dur + 0.01);
+}
+
+function playLeadNote(ctx, dest, freq, t, dur) {
+  const osc  = ctx.createOscillator();
+  const osc2 = ctx.createOscillator();
+  const filt = ctx.createBiquadFilter();
+  const g    = ctx.createGain();
+  const del  = ctx.createDelay(0.5);
+  const delG = ctx.createGain();
+
+  osc.type = 'square';   osc.frequency.value = freq;
+  osc2.type = 'sawtooth'; osc2.frequency.value = freq * 0.501; // sub octave
+  filt.type = 'bandpass'; filt.frequency.value = freq * 2; filt.Q.value = 2;
+
+  // Short ping-pong delay for energy
+  del.delayTime.value = STEP * 1.5;
+  delG.gain.value = 0.18;
+  g.connect(del); del.connect(delG); delG.connect(dest);
+
+  g.gain.setValueAtTime(0.001, t);
+  g.gain.linearRampToValueAtTime(0.28, t + 0.01);
+  g.gain.setValueAtTime(0.28, t + dur - 0.03);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+  osc.connect(filt); osc2.connect(filt);
+  filt.connect(g); g.connect(dest);
+  osc.start(t); osc2.start(t);
+  osc.stop(t + dur + 0.01); osc2.stop(t + dur + 0.01);
+}
+
+function playChordStab(ctx, dest, freqs, t) {
+  freqs.forEach(freq => {
+    const osc  = ctx.createOscillator();
+    const filt = ctx.createBiquadFilter();
+    const g    = ctx.createGain();
+    osc.type = 'sawtooth'; osc.frequency.value = freq;
+    filt.type = 'lowpass'; filt.frequency.value = 1800; filt.Q.value = 3;
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(0.12, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+    osc.connect(filt); filt.connect(g); g.connect(dest);
+    osc.start(t); osc.stop(t + 0.19);
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+// MAIN LOOP
+// ─────────────────────────────────────────────────────────
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // Pre-bake noise
+  getNoiseBuffer(audioCtx);
+  startMusic();
+}
+
+function startMusic() {
+  if (musicScheduled) return;
+  musicScheduled = true;
+  musicPlaying   = true;
+  scheduleLoop();
+}
+
+function scheduleLoop() {
+  if (!musicPlaying) return;
+
+  if (!masterGain) {
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.0;
+    // Compressor for loudness and punch
+    const comp = audioCtx.createDynamicsCompressor();
+    comp.threshold.value = -14;
+    comp.knee.value = 6;
+    comp.ratio.value = 4;
+    comp.attack.value = 0.003;
+    comp.release.value = 0.15;
+    masterGain.connect(comp);
+    comp.connect(audioCtx.destination);
+    // Fade in
+    masterGain.gain.linearRampToValueAtTime(0.82, audioCtx.currentTime + 0.4);
+  }
+
+  const t0 = audioCtx.currentTime + 0.05;
+
+  for (let s = 0; s < LOOP_LEN; s++) {
+    const t = t0 + s * STEP;
+
+    // ── Drums ────────────────────────────────────
+    if (KICK[s])     playKick(audioCtx, masterGain, t);
+    if (SNARE[s])    playSnare(audioCtx, masterGain, t);
+    if (HIHAT_C[s])  playClosedHat(audioCtx, masterGain, t);
+    if (HIHAT_O[s])  playOpenHat(audioCtx, masterGain, t);
+
+    // ── Bass ─────────────────────────────────────
+    const bFreq = BASS_PAT[s];
+    if (bFreq) {
+      // Duration: hold until next non-null or end of bar
+      let dur = STEP;
+      for (let k = s+1; k < LOOP_LEN; k++) {
+        if (BASS_PAT[k] !== null) break;
+        dur += STEP;
+      }
+      playBassNote(audioCtx, masterGain, bFreq, t, Math.min(dur, STEP * 3));
+    }
+
+    // ── Lead ─────────────────────────────────────
+    const lFreq = LEAD_PAT[s];
+    if (lFreq) {
+      let dur = STEP;
+      for (let k = s+1; k < LOOP_LEN; k++) {
+        if (LEAD_PAT[k] !== null) break;
+        dur += STEP;
+      }
+      playLeadNote(audioCtx, masterGain, lFreq, t, Math.min(dur * 0.85, STEP * 4));
+    }
+
+    // ── Chord stabs ──────────────────────────────
+    const ci = CHORD_STEPS.indexOf(s);
+    if (ci !== -1) playChordStab(audioCtx, masterGain, CHORDS[ci], t);
+  }
+
+  const loopDur = LOOP_LEN * STEP;
+  loopTimeout = setTimeout(scheduleLoop, (loopDur - 0.08) * 1000);
+}
+
+function stopMusic() {
+  musicPlaying = false;
+  if (loopTimeout) clearTimeout(loopTimeout);
+  if (masterGain) {
+    masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    masterGain.gain.setValueAtTime(masterGain.gain.value, audioCtx.currentTime);
+    masterGain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + 0.4);
+    setTimeout(() => { masterGain = null; musicScheduled = false; noiseBuffer = null; }, 500);
+  } else {
+    musicScheduled = false;
+  }
+}
+
+function toggleMusic() {
+  if (!audioCtx) {
+    initAudio();
+    document.getElementById('musicIcon').textContent = '♪';
+    document.getElementById('musicLabel').textContent = 'MUTE';
+  } else if (musicPlaying) {
+    stopMusic();
+    document.getElementById('musicIcon').textContent = '♩';
+    document.getElementById('musicLabel').textContent = 'PLAY';
+  } else {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    musicScheduled = false;
+    noiseBuffer = null;
+    startMusic();
+    document.getElementById('musicIcon').textContent = '♪';
+    document.getElementById('musicLabel').textContent = 'MUTE';
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// WALLET / WEB3 — RainbowKit-style chain gating
+// Contract: 0x2645FdCE9e7Cf803f396782110b0f93a54e3C876
+// Network:  Ritual · Chain ID 1979
+// ════════════════════════════════════════════════════════
+
+const RITUAL_CHAIN_ID     = 1979;
+const RITUAL_CHAIN_HEX    = '0x7BB';
+const CONTRACT_ADDRESS    = '0x2645FdCE9e7Cf803f396782110b0f93a54e3C876';
+const ENTRY_FEE           = '0.0002'; // RITUAL
+
+const RITUAL_CHAIN_PARAMS = {
+  chainId: RITUAL_CHAIN_HEX,
+  chainName: 'Ritual',
+  nativeCurrency: { name: 'RITUAL', symbol: 'RITUAL', decimals: 18 },
+  rpcUrls: ['http://rpc.ritualfoundation.org/'],
+  blockExplorerUrls: ['http://explorer.ritualfoundation.org/']
+};
+
+// Minimal ABI — only the functions we call
+const CONTRACT_ABI = [
+  "function registerSession(string calldata discordName) external payable returns (uint64)",
+  "function submitScore(uint256 score, uint32 questionsAnswered, uint32 bestStreak, uint8 tierReached, uint8 multiplierX10) external",
+  "function abandonSession() external",
+  "function activeSession(address) external view returns (uint64)",
+  "function getPlayerStats(address) external view returns (tuple(uint64,uint64,uint256,uint256,uint32,uint32,uint8,uint256,uint256,uint256))"
+];
+
+let provider, signer, userAddress, discordName, contract;
+
+// ── Chain state machine ───────────────────────────────────
+// States: 'disconnected' | 'wrong_chain' | 'no_chain' | 'connected'
+let walletState = 'disconnected';
+
+function setWalletState(state, addr) {
+  walletState = state;
+  const btn      = document.getElementById('connectBtn');
+  const pill     = document.getElementById('walletPill');
+  const chainMsg = document.getElementById('chainMsg');
+
+  // Hide chain message by default
+  chainMsg.style.display = 'none';
+  btn.disabled = false;
+
+  if (state === 'disconnected') {
+    btn.textContent = 'CONNECT WALLET';
+    pill.style.display = 'none';
+    document.getElementById('discordCard').style.display = 'none';
+    document.getElementById('entryCard').style.display = 'none';
+
+  } else if (state === 'no_chain') {
+    // Ritual not in wallet at all — show import request
+    btn.textContent = 'CONNECT WALLET';
+    pill.style.display = 'none';
+    document.getElementById('discordCard').style.display = 'none';
+    document.getElementById('entryCard').style.display = 'none';
+    chainMsg.style.display = 'flex';
+    chainMsg.className = 'chain-msg warn';
+    chainMsg.innerHTML = `
+      <div class="chain-msg-icon">⚠</div>
+      <div>
+        <div class="chain-msg-title">RITUAL NETWORK NOT FOUND</div>
+        <div class="chain-msg-sub">Click below to add Ritual (Chain ID 1979) to your wallet, then connect again.</div>
+      </div>
+      <button class="btn btn-primary" style="width:auto;padding:10px 18px;font-size:0.75rem;white-space:nowrap" onclick="addRitualChain()">ADD RITUAL</button>`;
+
+  } else if (state === 'wrong_chain') {
+    // Wallet connected but on wrong chain — show switch prompt
+    btn.textContent = 'CONNECT WALLET';
+    pill.style.display = 'none';
+    document.getElementById('discordCard').style.display = 'none';
+    document.getElementById('entryCard').style.display = 'none';
+    chainMsg.style.display = 'flex';
+    chainMsg.className = 'chain-msg error';
+    chainMsg.innerHTML = `
+      <div class="chain-msg-icon">🔴</div>
+      <div>
+        <div class="chain-msg-title">WRONG NETWORK</div>
+        <div class="chain-msg-sub">You're on the wrong chain. Switch to Ritual (Chain ID 1979) to continue.</div>
+      </div>
+      <button class="btn btn-gold" style="width:auto;padding:10px 18px;font-size:0.75rem;white-space:nowrap" onclick="switchToRitual()">SWITCH NETWORK</button>`;
+
+  } else if (state === 'connected') {
+    btn.textContent = '✓ CONNECTED';
+    btn.disabled = true;
+    pill.style.display = 'flex';
+    document.getElementById('walletAddr').textContent = addr.slice(0,6)+'...'+addr.slice(-4);
+    document.getElementById('discordCard').style.display = 'block';
+    document.getElementById('entryCard').style.display = 'block';
+    chainMsg.style.display = 'none';
+  }
+}
+
+async function addRitualChain() {
+  try {
+    await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [RITUAL_CHAIN_PARAMS] });
+    // After adding, try connecting again
+    await connectWallet();
+  } catch(e) {
+    showToast('Failed to add Ritual: ' + (e.message || e), 'error');
+  }
+}
+
+async function switchToRitual() {
+  try {
+    await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: RITUAL_CHAIN_HEX }] });
+    // switchEthereumChain resolves after switch — re-init provider
+    await connectWallet();
+  } catch(e) {
+    if (e.code === 4902) {
+      // Chain not in wallet, need to add it
+      await addRitualChain();
+    } else {
+      showToast('Switch failed: ' + (e.message || e), 'error');
+    }
+  }
+}
+
+async function connectWallet() {
+  if (!window.ethereum) {
+    showToast('Please install MetaMask to use Matheritual!', 'error');
+    return;
+  }
+  const btn = document.getElementById('connectBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>CONNECTING...';
+
+  try {
+    // 1. Request accounts
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+    // 2. Check current chain
+    const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+    const chainId    = parseInt(chainIdHex, 16);
+
+    if (chainId !== RITUAL_CHAIN_ID) {
+      // Try to switch
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: RITUAL_CHAIN_HEX }]
+        });
+      } catch(switchErr) {
+        if (switchErr.code === 4902) {
+          // Chain not in wallet
+          setWalletState('no_chain');
+          return;
+        }
+        // User rejected or other error
+        setWalletState('wrong_chain');
+        return;
+      }
+    }
+
+    // 3. Verify chain after switch
+    const finalChainHex = await window.ethereum.request({ method: 'eth_chainId' });
+    const finalChainId  = parseInt(finalChainHex, 16);
+    if (finalChainId !== RITUAL_CHAIN_ID) {
+      setWalletState('wrong_chain');
+      return;
+    }
+
+    // 4. All good — establish connection
+    provider    = new ethers.providers.Web3Provider(window.ethereum, 'any');
+    signer      = provider.getSigner();
+    userAddress = await signer.getAddress();
+    contract    = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+    setWalletState('connected', userAddress);
+    if (!audioCtx) initAudio();
+
+    // 5. Listen for chain/account changes
+    window.ethereum.on('chainChanged', () => {
+      setWalletState('disconnected');
+      showToast('Network changed — please reconnect', 'warn');
+    });
+    window.ethereum.on('accountsChanged', (accs) => {
+      if (!accs.length) setWalletState('disconnected');
+      else location.reload();
+    });
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'CONNECT WALLET';
+    showToast('Connection failed: ' + (e.message || e), 'error');
+  }
+}
+
+// ── PAY & REGISTER (calls contract.registerSession) ──────
+async function payAndStart() {
+  discordName = document.getElementById('discordInput').value.trim();
+  if (!discordName) { document.getElementById('discordInput').focus(); return; }
+  if (!contract)    { showToast('Connect wallet first', 'error'); return; }
+
+  const btn    = document.getElementById('payBtn');
+  const status = document.getElementById('txStatus');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>SIGNING TRANSACTION...';
+  status.className = 'tx-status show';
+  status.textContent = '⏳ Waiting for wallet confirmation...';
+
+  try {
+    const tx = await contract.registerSession(discordName, {
+      value: ethers.utils.parseEther(ENTRY_FEE)
+    });
+    status.textContent = '⏳ Transaction sent · Awaiting confirmation...';
+    const receipt = await tx.wait();
+    status.className = 'tx-status show success';
+    status.textContent = '✓ TX Confirmed: ' + receipt.transactionHash.slice(0,22) + '...';
+    btn.textContent = '✓ REGISTERED';
+
+    // Parse session ID from event log
+    const iface = new ethers.utils.Interface([
+      "event SessionRegistered(address indexed player, uint64 indexed globalId, string discordName, uint256 fee, uint256 timestamp)"
+    ]);
+    const log = receipt.logs.find(l => {
+      try { iface.parseLog(l); return true; } catch { return false; }
+    });
+    if (log) {
+      const parsed = iface.parseLog(log);
+      console.log('Session ID:', parsed.args.globalId.toString());
+    }
+
+    setTimeout(() => showScreen('screenBegin'), 1200);
+    document.getElementById('beginDiscord').textContent = discordName;
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'PAY & REGISTER';
+    status.className = 'tx-status show error';
+    status.textContent = '✗ ' + (e.reason || e.message || 'Transaction failed');
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// GAME STATE
+// ════════════════════════════════════════════════════════
+const TIERS = ['WARM-UP','EASY','MODERATE','STEADY','CHALLENGING','TOUGH','HARD','INTENSE','BRUTAL','EXTREME'];
+const TIER_COLORS = ['#45d450','#5eff6a','#7eff88','#a0ff55','#d4e030','#f7c948','#ffaa00','#ff7700','#ff4422','#ff1111'];
+
+let gameState = {
+  questionNum: 0,
+  score: 0,
+  streak: 0,
+  bestStreak: 0,
+  timerMax: 20,
+  timeLeft: 20,
+  timerInterval: null,
+  active: false,
+  currentAnswer: null,
+  locked: false
+};
+
+function getTier(q) { return Math.min(Math.floor(q / 5), 9); }
+function getTimerMax(q) { return Math.max(20 - Math.floor(q/4), 6); }
+function getMultiplier(streak) {
+  if (streak >= 20) return 5.0;
+  if (streak >= 15) return 3.5;
+  if (streak >= 10) return 2.5;
+  if (streak >= 7) return 2.0;
+  if (streak >= 5) return 1.75;
+  if (streak >= 3) return 1.5;
+  if (streak >= 2) return 1.25;
+  return 1.0;
+}
+
+function generateQuestion(q) {
+  const tier = getTier(q);
+  let a, b, op, answer, display;
+
+  if (tier === 0) {
+    // Warm-Up: single digit add/sub
+    a = rnd(1,9); b = rnd(1,9); op = rnd(0,1) ? '+' : '-';
+    if (op === '-' && b > a) [a,b] = [b,a];
+    answer = op==='+' ? a+b : a-b;
+    display = `${a} ${op} ${b} = ?`;
+
+  } else if (tier === 1) {
+    // Easy: 2-digit add/sub
+    a = rnd(10,50); b = rnd(1,30);
+    op = rnd(0,1) ? '+' : '-';
+    if (op === '-' && b > a) [a,b] = [b,a];
+    answer = op==='+' ? a+b : a-b;
+    display = `${a} ${op} ${b} = ?`;
+
+  } else if (tier === 2) {
+    // Moderate: times tables
+    a = rnd(2,9); b = rnd(2,9);
+    answer = a * b; op = '×';
+    display = `${a} ${op} ${b} = ?`;
+
+  } else if (tier === 3) {
+    // Steady: 2-digit × single
+    a = rnd(10,25); b = rnd(2,9);
+    answer = a * b; op = '×';
+    display = `${a} ${op} ${b} = ?`;
+
+  } else if (tier === 4) {
+    // Challenging: division
+    b = rnd(2,9); answer = rnd(2,12); a = b * answer;
+    op = '÷';
+    display = `${a} ${op} ${b} = ?`;
+
+  } else if (tier === 5) {
+    // Tough: 3-digit add/sub
+    a = rnd(100,500); b = rnd(50,200);
+    op = rnd(0,1) ? '+' : '-';
+    if (op === '-' && b > a) [a,b] = [b,a];
+    answer = op==='+' ? a+b : a-b;
+    display = `${a} ${op} ${b} = ?`;
+
+  } else if (tier === 6) {
+    // Hard: 2-digit × 2-digit
+    a = rnd(11,30); b = rnd(11,20);
+    answer = a * b; op = '×';
+    display = `${a} ${op} ${b} = ?`;
+
+  } else if (tier === 7) {
+    // Intense: mixed ops + brackets
+    const x = rnd(2,9), y = rnd(2,9), z = rnd(1,9);
+    answer = (x + y) * z;
+    display = `(${x} + ${y}) × ${z} = ?`;
+
+  } else if (tier === 8) {
+    // Brutal: squares + harder
+    const ch = rnd(0,2);
+    if (ch === 0) {
+      a = rnd(11,20); answer = a*a;
+      display = `${a}² = ?`;
+    } else if (ch === 1) {
+      a = rnd(50,200); b = rnd(10,50); const c = rnd(2,5);
+      answer = a + b * c;
+      display = `${a} + ${b} × ${c} = ?`;
+    } else {
+      a = rnd(100,999); b = rnd(10,99);
+      answer = a - b;
+      display = `${a} − ${b} = ?`;
+    }
+
+  } else {
+    // Extreme: very hard
+    const ch = rnd(0,2);
+    if (ch === 0) {
+      a = rnd(20,40); b = rnd(20,40);
+      answer = a * b; op = '×';
+      display = `${a} × ${b} = ?`;
+    } else if (ch === 1) {
+      const x = rnd(5,15), y = rnd(5,15), z = rnd(5,15);
+      answer = x * y - z;
+      display = `${x} × ${y} − ${z} = ?`;
+    } else {
+      a = rnd(200,999); b = rnd(10,20);
+      answer = Math.floor(a/b);
+      display = `${a} ÷ ${b} = ?`;
+    }
+  }
+
+  // Generate wrong options
+  const opts = generateOptions(answer, tier);
+  return { display, answer, opts };
+}
+
+function generateOptions(correct, tier) {
+  const set = new Set([correct]);
+  const spread = Math.max(3, Math.floor(correct * 0.25) + tier * 2);
+  while (set.size < 4) {
+    let w = correct + rnd(-spread, spread);
+    if (w === correct || w < 0) continue;
+    set.add(w);
+  }
+  return shuffle([...set]);
+}
+
+function rnd(a, b) { return Math.floor(Math.random()*(b-a+1))+a; }
+function shuffle(arr) {
+  for (let i=arr.length-1;i>0;i--) {
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+
+// ════════════════════════════════════════════════════════
+// QUIZ LOGIC
+// ════════════════════════════════════════════════════════
+function beginGame() {
+  showScreen('screenQuiz');
+  gameState = {
+    questionNum: 0, score: 0, streak: 0, bestStreak: 0,
+    timerMax: 20, timeLeft: 20, timerInterval: null,
+    active: true, currentAnswer: null, locked: false
+  };
+  nextQuestion();
+}
+
+function nextQuestion() {
+  if (!gameState.active) return;
+  gameState.locked = false;
+  const q = gameState.questionNum;
+  const tier = getTier(q);
+  const timerMax = getTimerMax(q);
+  gameState.timerMax = timerMax;
+  gameState.timeLeft = timerMax;
+
+  // Update UI labels
+  const tierName = TIERS[tier];
+  const tierColor = TIER_COLORS[tier];
+  document.getElementById('tierBadge').textContent = tierName;
+  document.getElementById('tierBadge').style.color = tierColor;
+  document.getElementById('tierBadge').style.borderColor = tierColor+'44';
+  document.getElementById('qNum').textContent = q+1;
+  document.getElementById('qNumBig').textContent = q+1;
+  document.getElementById('timeLabel').textContent = timerMax+'s';
+
+  // Tier progress (within current tier)
+  const tierQ = q % 5;
+  document.getElementById('tierQ').textContent = tierQ;
+  document.getElementById('tierFill').style.width = (tierQ/5*100)+'%';
+
+  // Score & streak
+  document.getElementById('scoreDisplay').textContent = gameState.score.toLocaleString();
+  updateStreakUI();
+
+  // Generate question
+  const { display, answer, opts } = generateQuestion(q);
+  gameState.currentAnswer = answer;
+  document.getElementById('questionText').textContent = display;
+
+  // Build options
+  const grid = document.getElementById('optionsGrid');
+  grid.innerHTML = '';
+  const letters = ['A','B','C','D'];
+  opts.forEach((val, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'opt-btn';
+    btn.innerHTML = `<span class="opt-letter">${letters[i]}</span>${val}`;
+    btn.onclick = () => selectAnswer(val, btn, opts);
+    grid.appendChild(btn);
+  });
+
+  // Start timer
+  startTimer();
+}
+
+function startTimer() {
+  clearInterval(gameState.timerInterval);
+  const arc = document.getElementById('timerArc');
+  const numEl = document.getElementById('timerNum');
+  const total = 238.76; // 2*pi*38
+
+  gameState.timerInterval = setInterval(() => {
+    gameState.timeLeft--;
+    const pct = gameState.timeLeft / gameState.timerMax;
+    arc.style.strokeDashoffset = total * (1 - pct);
+
+    // Color
+    let stroke = '#45d450';
+    numEl.className = 'timer-num';
+    if (pct < 0.35) { stroke = '#ff4444'; numEl.className = 'timer-num danger'; }
+    else if (pct < 0.55) { stroke = '#ffaa00'; numEl.className = 'timer-num warn'; }
+    arc.style.stroke = stroke;
+    numEl.textContent = gameState.timeLeft;
+
+    if (gameState.timeLeft <= 0) {
+      clearInterval(gameState.timerInterval);
+      onWrong(null);
+    }
+  }, 1000);
+}
+
+function selectAnswer(val, btn, opts) {
+  if (gameState.locked) return;
+  gameState.locked = true;
+  clearInterval(gameState.timerInterval);
+
+  const correct = val === gameState.currentAnswer;
+  const allBtns = document.querySelectorAll('.opt-btn');
+  allBtns.forEach(b => { b.disabled = true; });
+
+  // Highlight correct
+  allBtns.forEach(b => {
+    const bVal = parseInt(b.textContent.replace(/[A-D]/,''));
+    if (bVal === gameState.currentAnswer) b.classList.add('correct');
+  });
+
+  if (correct) {
+    btn.classList.add('correct');
+    onCorrect();
+  } else {
+    btn.classList.add('wrong');
+    onWrong(btn);
+  }
+}
+
+function onCorrect() {
+  gameState.streak++;
+  if (gameState.streak > gameState.bestStreak) gameState.bestStreak = gameState.streak;
+  const mult = getMultiplier(gameState.streak);
+  const timeBonus = Math.floor(gameState.timeLeft * 2);
+  const base = 100 + getTier(gameState.questionNum) * 50;
+  const points = Math.floor((base + timeBonus) * mult);
+  gameState.score += points;
+
+  showFeedback('+' + points, true);
+  spawnParticles();
+  gameState.questionNum++;
+  setTimeout(nextQuestion, 800);
+}
+
+function onWrong(btn) {
+  gameState.active = false;
+  showFeedback('✗', false);
+  setTimeout(endGame, 900);
+}
+
+function stopGame() {
+  if (!gameState.active) return;
+  gameState.active = false;
+  clearInterval(gameState.timerInterval);
+  endGame(true);
+}
+
+function endGame(voluntary = false) {
+  clearInterval(gameState.timerInterval);
+  const tier = TIERS[getTier(Math.max(0, gameState.questionNum-1))];
+  document.getElementById('finalScore').textContent = gameState.score.toLocaleString();
+  document.getElementById('overLabel').textContent = voluntary ? 'SCORE SAVED' : 'GAME OVER — WRONG ANSWER';
+  document.getElementById('statQ').textContent = gameState.questionNum;
+  document.getElementById('statStreak').textContent = gameState.bestStreak;
+  document.getElementById('statTier').textContent = tier;
+  document.getElementById('statMult').textContent = '×'+getMultiplier(gameState.bestStreak).toFixed(1);
+  document.getElementById('saveDiscord').textContent = discordName || '—';
+  document.getElementById('saveScore').textContent = gameState.score.toLocaleString();
+  showScreen('screenOver');
+}
+
+function updateStreakUI() {
+  const icons = document.getElementById('streakIcons');
+  icons.innerHTML = '';
+  const show = Math.min(gameState.streak, 10);
+  for (let i=0; i<10; i++) {
+    const d = document.createElement('div');
+    d.className = 'streak-dot' + (i < show ? (gameState.streak >= 10 ? ' gold-dot' : ' lit') : '');
+    icons.appendChild(d);
+  }
+  document.getElementById('streakVal').textContent = '×'+getMultiplier(gameState.streak).toFixed(1);
+}
+
+function showFeedback(text, correct) {
+  const el = document.createElement('div');
+  el.className = 'feedback ' + (correct ? 'correct' : 'wrong');
+  el.textContent = text;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 850);
+}
+
+function spawnParticles() {
+  for (let i=0; i<10; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.cssText = `left:${45+rnd(-20,20)}%;top:${50+rnd(-20,20)}%;
+      --dx:${rnd(-80,80)}px;--dy:${rnd(-120,-20)}px;
+      background:${rnd(0,1)?'var(--ga)':'var(--gold)'};
+      animation-delay:${rnd(0,200)}ms`;
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 1200);
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// SAVE ON-CHAIN — calls contract.submitScore
+// ════════════════════════════════════════════════════════
+async function saveOnChain() {
+  if (!contract) { showToast('Wallet not connected', 'error'); return; }
+  const btn    = document.getElementById('saveBtn');
+  const status = document.getElementById('saveTxStatus');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>SAVING TO CHAIN...';
+  status.className = 'tx-status show';
+  status.textContent = '⏳ Signing save transaction...';
+
+  try {
+    const tier     = Math.min(getTier(Math.max(0, gameState.questionNum - 1)), 9);
+    const multX10  = Math.round(getMultiplier(gameState.bestStreak) * 10);
+
+    const tx = await contract.submitScore(
+      gameState.score,
+      gameState.questionNum,
+      gameState.bestStreak,
+      tier,
+      multX10
+    );
+    status.textContent = '⏳ Awaiting block confirmation...';
+    const receipt = await tx.wait();
+    status.className = 'tx-status show success';
+    status.textContent = '✓ Score saved on-chain! TX: ' + receipt.transactionHash.slice(0,22) + '...';
+    btn.textContent = '✓ SAVED ON-CHAIN';
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'SAVE ON-CHAIN';
+    status.className = 'tx-status show error';
+    status.textContent = '✗ ' + (e.reason || e.message || 'Save failed');
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// TOAST NOTIFICATIONS
+// ════════════════════════════════════════════════════════
+let toastTimer = null;
+function showToast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (type ? ' ' + type : '');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3500);
+}
+
+// ════════════════════════════════════════════════════════
+// NAV
+// ════════════════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function resetApp() {
+  gameState.active = false;
+  clearInterval(gameState.timerInterval);
+  showScreen('screenConnect');
+}
+
+// Auto-start music on first interaction
+document.body.addEventListener('click', () => {
+  if (!audioCtx) initAudio();
+}, { once: true });
+</script>
+</body>
+</html>
