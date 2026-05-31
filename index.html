@@ -1776,6 +1776,33 @@ function showScreen(id) {
 function resetApp() {
   gameState.active = false;
   clearInterval(gameState.timerInterval);
+
+  // Reset pay button and tx status
+  const payBtn = document.getElementById('payBtn');
+  payBtn.disabled = false;
+  payBtn.textContent = 'PAY & REGISTER';
+  const txStatus = document.getElementById('txStatus');
+  txStatus.className = 'tx-status';
+  txStatus.textContent = '';
+
+  // Keep discord name — player already registered it, they can change it manually
+
+  // Reset save button
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.disabled = false;
+  saveBtn.textContent = 'SAVE ON-CHAIN';
+  const saveTx = document.getElementById('saveTxStatus');
+  saveTx.className = 'tx-status';
+  saveTx.textContent = '';
+
+  // If wallet still connected, keep cards visible and button locked
+  if (walletState === 'connected') {
+    document.getElementById('connectBtn').textContent = '✓ CONNECTED';
+    document.getElementById('connectBtn').disabled = true;
+    document.getElementById('discordCard').style.display = 'block';
+    document.getElementById('entryCard').style.display = 'block';
+  }
+
   showScreen('screenConnect');
 }
 
