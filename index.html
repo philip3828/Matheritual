@@ -1894,7 +1894,10 @@ function resetApp() {
 const TIERS_LIST = ['WARM-UP','EASY','MODERATE','STEADY','CHALLENGING','TOUGH','HARD','INTENSE','BRUTAL','EXTREME'];
 
 function getReadProvider() {
-  return new ethers.providers.JsonRpcProvider('https://rpc.ritualfoundation.org/');
+  // Use a CORS proxy to bypass browser restrictions on the RPC endpoint
+  const corsProxy = 'https://corsproxy.io/?';
+  const rpcUrl = 'https://rpc.ritualfoundation.org/';
+  return new ethers.providers.JsonRpcProvider(corsProxy + encodeURIComponent(rpcUrl));
 }
 
 async function fetchOnChainLeaderboard() {
