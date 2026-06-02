@@ -1898,8 +1898,14 @@ let lbCache = [];
 let lbLastBlock = 0;
 
 async function fetchOnChainLeaderboard() {
-  // Use ethers.js read-only provider — handles CORS and RPC properly
-  const readProvider = new ethers.providers.JsonRpcProvider('https://rpc.ritualfoundation.org');
+  // Use MetaMask provider if connected, else fall back to JsonRpc
+  // MetaMask bypasses CORS — JsonRpc will fail from browser
+  let readProvider;
+  if (window.ethereum) {
+    readProvider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+  } else {
+    readProvider = new ethers.providers.JsonRpcProvider('https://rpc.ritualfoundation.org');
+  }
   const readContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, readProvider);
 
   // Check latest block — skip full fetch if nothing new
@@ -1990,7 +1996,7 @@ async function renderLeaderboard() {
   } catch(err) {
     console.error('Leaderboard fetch error:', err);
     if (!tbody.dataset.loaded) {
-      tbody.innerHTML = '<tr><td colspan="6" class="lb-empty" style="color:#ff7777">⚠ Could not load scores. Check RPC connection.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="lb-empty" style="color:#ff7777">⚠ Connect your MetaMask wallet first, then open the leaderboard.</td></tr>';
       lbCount.textContent = 'error';
     }
   }
