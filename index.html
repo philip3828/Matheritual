@@ -1893,58 +1893,70 @@ function resetApp() {
 
 const TIERS_LIST = ['WARM-UP','EASY','MODERATE','STEADY','CHALLENGING','TOUGH','HARD','INTENSE','BRUTAL','EXTREME'];
 
-function getReadProvider() {
-  // Use a CORS proxy to bypass browser restrictions on the RPC endpoint
-  const corsProxy = 'https://corsproxy.io/?';
-  const rpcUrl = 'https://rpc.ritualfoundation.org/';
-  return new ethers.providers.JsonRpcProvider(corsProxy + encodeURIComponent(rpcUrl));
-}
-
 async function fetchOnChainLeaderboard() {
-  const readProvider = getReadProvider();
-  const readContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, readProvider);
+  const rpcUrl = 'https://rpc.ritualfoundation.org/';
 
-  const [scoreEvents, registerEvents] = await Promise.all([
-    readContract.queryFilter(readContract.filters.ScoreSubmitted(), 0, 'latest'),
-    readContract.queryFilter(readContract.filters.SessionRegistered(), 0, 'latest')
+  async function rpcCall(method, params) {
+    const res = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
+    });
+    const json = await res.json();
+    if (json.error) throw new Error(json.error.message);
+    return json.result;
+  }
+
+  const latestHex = await rpcCall('eth_blockNumber', []);
+  const latest = parseInt(latestHex, 16);
+  const fromBlock = Math.max(0, latest - 50000);
+  const fromHex = '0x' + fromBlock.toString(16);
+
+  const SCORE_TOPIC = ethers.utils.id('ScoreSubmitted(address,uint64,uint256,uint32,uint32,uint8,uint8,uint256)');
+  const REG_TOPIC   = ethers.utils.id('SessionRegistered(address,uint64,string,uint256,uint256)');
+
+  const [scoreLogs, regLogs] = await Promise.all([
+    rpcCall('eth_getLogs', [{ fromBlock: fromHex, toBlock: 'latest', address: CONTRACT_ADDRESS, topics: [SCORE_TOPIC] }]),
+    rpcCall('eth_getLogs', [{ fromBlock: fromHex, toBlock: 'latest', address: CONTRACT_ADDRESS, topics: [REG_TOPIC] }])
   ]);
 
-  // Map wallet → FIRST ever registered name (lowest block number wins)
+  const iface = new ethers.utils.Interface(CONTRACT_ABI);
+
   const nameMap = {};
-  for (const ev of registerEvents) {
-    const addr = ev.args.player.toLowerCase();
-    const existing = nameMap[addr];
-    if (!existing || ev.blockNumber < existing.blockNumber) {
-      nameMap[addr] = { name: ev.args.discordName, blockNumber: ev.blockNumber };
-    }
+  for (const log of regLogs) {
+    try {
+      const parsed = iface.parseLog(log);
+      const addr = parsed.args.player.toLowerCase();
+      const bn = parseInt(log.blockNumber, 16);
+      if (!nameMap[addr] || bn < nameMap[addr].blockNumber) {
+        nameMap[addr] = { name: parsed.args.discordName, blockNumber: bn };
+      }
+    } catch(e) {}
   }
-  // Flatten to just the name string
-  for (const addr in nameMap) {
-    nameMap[addr] = nameMap[addr].name;
-  }
+  for (const addr in nameMap) nameMap[addr] = nameMap[addr].name;
 
-  // Map wallet → most recent score by block number
   const scoreMap = {};
-  for (const ev of scoreEvents) {
-    const addr = ev.args.player.toLowerCase();
-    const existing = scoreMap[addr];
-    if (!existing || ev.blockNumber > existing.blockNumber) {
-      scoreMap[addr] = {
-        address:   ev.args.player,
-        name:      nameMap[addr] || ev.args.player.slice(0,6) + '...',
-        score:     ev.args.score.toNumber(),
-        questions: ev.args.questionsAnswered,
-        streak:    ev.args.bestStreak,
-        tier:      TIERS_LIST[Math.min(ev.args.tierReached, 9)] || 'WARM-UP',
-        blockNumber: ev.blockNumber,
-        timestamp: ev.args.timestamp.toNumber()
-      };
-    }
+  for (const log of scoreLogs) {
+    try {
+      const parsed = iface.parseLog(log);
+      const addr = parsed.args.player.toLowerCase();
+      const bn = parseInt(log.blockNumber, 16);
+      const existing = scoreMap[addr];
+      if (!existing || bn > existing.blockNumber) {
+        scoreMap[addr] = {
+          address:   parsed.args.player,
+          name:      nameMap[addr] || parsed.args.player.slice(0,6) + '...',
+          score:     parsed.args.score.toNumber(),
+          questions: parsed.args.questionsAnswered,
+          streak:    parsed.args.bestStreak,
+          tier:      TIERS_LIST[Math.min(parsed.args.tierReached, 9)] || 'WARM-UP',
+          blockNumber: bn
+        };
+      }
+    } catch(e) {}
   }
 
-  return Object.values(scoreMap)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 100);
+  return Object.values(scoreMap).sort((a, b) => b.score - a.score).slice(0, 100);
 }
 
 let lbRefreshInterval = null;
