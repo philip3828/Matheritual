@@ -1893,6 +1893,10 @@ function resetApp() {
 
 const TIERS_LIST = ['WARM-UP','EASY','MODERATE','STEADY','CHALLENGING','TOUGH','HARD','INTENSE','BRUTAL','EXTREME'];
 
+// Cache so leaderboard doesn't twitch on refresh — only updates if data changes
+let lbCache = [];
+let lbLastBlock = 0;
+
 async function fetchOnChainLeaderboard() {
   const rpcUrl = 'https://rpc.ritualfoundation.org/';
 
@@ -1907,21 +1911,25 @@ async function fetchOnChainLeaderboard() {
     return json.result;
   }
 
+  // Check latest block — if nothing new since last fetch, return cache
   const latestHex = await rpcCall('eth_blockNumber', []);
   const latest = parseInt(latestHex, 16);
-  const fromBlock = Math.max(0, latest - 50000);
-  const fromHex = '0x' + fromBlock.toString(16);
+  if (lbCache.length > 0 && latest <= lbLastBlock) {
+    return lbCache; // No new blocks — return cached data, no twitch
+  }
 
   const SCORE_TOPIC = ethers.utils.id('ScoreSubmitted(address,uint64,uint256,uint32,uint32,uint8,uint8,uint256)');
   const REG_TOPIC   = ethers.utils.id('SessionRegistered(address,uint64,string,uint256,uint256)');
 
+  // Always query from block 0 — nobody disappears ever
   const [scoreLogs, regLogs] = await Promise.all([
-    rpcCall('eth_getLogs', [{ fromBlock: fromHex, toBlock: 'latest', address: CONTRACT_ADDRESS, topics: [SCORE_TOPIC] }]),
-    rpcCall('eth_getLogs', [{ fromBlock: fromHex, toBlock: 'latest', address: CONTRACT_ADDRESS, topics: [REG_TOPIC] }])
+    rpcCall('eth_getLogs', [{ fromBlock: '0x0', toBlock: 'latest', address: CONTRACT_ADDRESS, topics: [SCORE_TOPIC] }]),
+    rpcCall('eth_getLogs', [{ fromBlock: '0x0', toBlock: 'latest', address: CONTRACT_ADDRESS, topics: [REG_TOPIC] }])
   ]);
 
   const iface = new ethers.utils.Interface(CONTRACT_ABI);
 
+  // Build name map — first ever registration wins (lowest block number)
   const nameMap = {};
   for (const log of regLogs) {
     try {
@@ -1935,6 +1943,7 @@ async function fetchOnChainLeaderboard() {
   }
   for (const addr in nameMap) nameMap[addr] = nameMap[addr].name;
 
+  // Build score map — most recent score per wallet (highest block number)
   const scoreMap = {};
   for (const log of scoreLogs) {
     try {
@@ -1943,9 +1952,11 @@ async function fetchOnChainLeaderboard() {
       const bn = parseInt(log.blockNumber, 16);
       const existing = scoreMap[addr];
       if (!existing || bn > existing.blockNumber) {
+        // Only show name — never fall back to wallet address
+        const displayName = nameMap[addr] || '—';
         scoreMap[addr] = {
           address:   parsed.args.player,
-          name:      nameMap[addr] || parsed.args.player.slice(0,6) + '...',
+          name:      displayName,
           score:     parsed.args.score.toNumber(),
           questions: parsed.args.questionsAnswered,
           streak:    parsed.args.bestStreak,
@@ -1956,7 +1967,11 @@ async function fetchOnChainLeaderboard() {
     } catch(e) {}
   }
 
-  return Object.values(scoreMap).sort((a, b) => b.score - a.score).slice(0, 100);
+  // Update cache and last known block
+  lbCache = Object.values(scoreMap).sort((a, b) => b.score - a.score).slice(0, 100);
+  lbLastBlock = latest;
+
+  return lbCache;
 }
 
 let lbRefreshInterval = null;
@@ -1965,7 +1980,9 @@ async function renderLeaderboard() {
   const tbody   = document.getElementById('lbBody');
   const lbCount = document.getElementById('lbCount');
 
-  if (!tbody.dataset.loaded) {
+  // Only show spinner on very first load — never flash on auto-refresh
+  const isFirstLoad = !tbody.dataset.loaded;
+  if (isFirstLoad) {
     tbody.innerHTML = '<tr><td colspan="6" class="lb-empty">⏳ Loading scores from chain...</td></tr>';
     lbCount.textContent = 'fetching...';
   }
