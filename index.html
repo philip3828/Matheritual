@@ -1897,15 +1897,17 @@ const TIERS_LIST = ['WARM-UP','EASY','MODERATE','STEADY','CHALLENGING','TOUGH','
 let lbCache = [];
 let lbLastBlock = 0;
 
+// Block your contract was deployed at — get this from the explorer
+// http://explorer.ritualfoundation.org/address/0x2645FdCE9e7Cf803f396782110b0f93a54e3C876
+const CONTRACT_DEPLOY_BLOCK = 1; // UPDATE THIS after checking explorer
+
 async function fetchOnChainLeaderboard() {
-  // Use MetaMask provider if connected, else fall back to JsonRpc
-  // MetaMask bypasses CORS — JsonRpc will fail from browser
-  let readProvider;
-  if (window.ethereum) {
-    readProvider = new ethers.providers.Web3Provider(window.ethereum, 'any');
-  } else {
-    readProvider = new ethers.providers.JsonRpcProvider('https://rpc.ritualfoundation.org');
+  if (!window.ethereum) {
+    throw new Error('MetaMask not installed');
   }
+
+  // Must use MetaMask provider — Ritual RPC blocks eth_getLogs from browser fetch
+  const readProvider = new ethers.providers.Web3Provider(window.ethereum, 'any');
   const readContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, readProvider);
 
   // Check latest block — skip full fetch if nothing new
@@ -1914,10 +1916,10 @@ async function fetchOnChainLeaderboard() {
     return lbCache;
   }
 
-  // Query all events from block 0 — nobody ever disappears
+  // Use deploy block not 0 — reduces query size and avoids RPC timeouts
   const [scoreEvents, registerEvents] = await Promise.all([
-    readContract.queryFilter(readContract.filters.ScoreSubmitted(), 0, 'latest'),
-    readContract.queryFilter(readContract.filters.SessionRegistered(), 0, 'latest')
+    readContract.queryFilter(readContract.filters.ScoreSubmitted(), CONTRACT_DEPLOY_BLOCK, 'latest'),
+    readContract.queryFilter(readContract.filters.SessionRegistered(), CONTRACT_DEPLOY_BLOCK, 'latest')
   ]);
 
   // First ever name per wallet — lowest block number wins
@@ -1996,7 +1998,7 @@ async function renderLeaderboard() {
   } catch(err) {
     console.error('Leaderboard fetch error:', err);
     if (!tbody.dataset.loaded) {
-      tbody.innerHTML = '<tr><td colspan="6" class="lb-empty" style="color:#ff7777">⚠ Connect your MetaMask wallet first, then open the leaderboard.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="lb-empty" style="color:#ff7777">⚠ Please connect your wallet first to view the leaderboard.</td></tr>';
       lbCount.textContent = 'error';
     }
   }
