@@ -542,43 +542,6 @@
     .options-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
     .opt-btn { padding: 12px 8px; font-size: 0.8rem; }
   }
-
-  .lb-btn {
-    background: rgba(247,201,72,0.08);
-    border: 1px solid rgba(247,201,72,0.25);
-    color: var(--gold);
-    padding: 8px 14px; border-radius: 8px;
-    cursor: pointer; font-family: var(--font-mono); font-size: 0.75rem;
-    transition: all 0.2s;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .lb-btn:hover { background: rgba(247,201,72,0.15); box-shadow: 0 0 12px rgba(247,201,72,0.3); }
-  .lb-table { width: 100%; border-collapse: collapse; }
-  .lb-table th {
-    font-family: var(--font-mono); font-size: 0.65rem; letter-spacing: 0.15em;
-    color: rgba(94,255,106,0.5); text-transform: uppercase;
-    padding: 8px 10px; border-bottom: 1px solid rgba(94,255,106,0.12);
-    text-align: left;
-  }
-  .lb-table td {
-    font-family: var(--font-mono); font-size: 0.78rem;
-    padding: 10px 10px; border-bottom: 1px solid rgba(94,255,106,0.06);
-    color: var(--white); vertical-align: middle;
-  }
-  .lb-table tr:hover td { background: rgba(94,255,106,0.04); }
-  .lb-rank { font-family: var(--font-display); font-size: 0.85rem; font-weight: 900; color: rgba(94,255,106,0.4); width: 36px; }
-  .lb-rank.gold   { color: #f7c948; filter: drop-shadow(0 0 6px #f7c948); }
-  .lb-rank.silver { color: #c0c8d0; }
-  .lb-rank.bronze { color: #cd7f32; }
-  .lb-score { font-family: var(--font-display); font-size: 0.9rem; font-weight: 800; color: var(--gold); text-align: right; }
-  .lb-you { background: rgba(94,255,106,0.06) !important; }
-  .lb-you td { color: var(--ga) !important; }
-  .lb-empty { text-align: center; padding: 40px 20px; font-family: var(--font-mono); font-size: 0.8rem; color: rgba(94,255,106,0.3); }
-  .lb-addr { color: rgba(94,255,106,0.45); font-size: 0.7rem; }
-  .lb-tier { font-size: 0.65rem; padding: 2px 7px; border-radius: 100px; background: rgba(94,255,106,0.08); border: 1px solid rgba(94,255,106,0.15); color: rgba(94,255,106,0.6); white-space: nowrap; }
-  .lb-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-  .lb-title { font-family: var(--font-display); font-size: 1rem; font-weight: 900; color: var(--ga); }
-  .lb-count { font-family: var(--font-mono); font-size: 0.7rem; color: rgba(94,255,106,0.4); }
 </style>
 </head>
 <body>
@@ -591,7 +554,6 @@
 <header class="site-header">
   <div class="logo">MATHERITUAL</div>
   <div class="header-right">
-    <button class="lb-btn" onclick="openLeaderboard()">🏆 BOARD</button>
     <button class="music-btn" id="musicBtn" onclick="toggleMusic()">
       <span class="icon" id="musicIcon">♪</span>
       <span id="musicLabel">MUTE</span>
@@ -777,34 +739,6 @@
 
     <button class="btn btn-outline" onclick="resetApp()">⚡ PLAY AGAIN</button>
   <button class="btn btn-outline" style="margin-top:4px;opacity:0.6" onclick="resetApp()">⌂ HOME</button>
-  </div>
-
-<!-- ══ SCREEN 5: LEADERBOARD ══ -->
-  <div class="screen" id="screenLeaderboard">
-    <div class="card">
-      <div class="lb-header-row">
-        <div class="lb-title">🏆 LEADERBOARD</div>
-        <div class="lb-count" id="lbCount">0 players</div>
-      </div>
-      <div style="overflow-x:auto">
-        <table class="lb-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>PLAYER</th>
-              <th>WALLET</th>
-              <th>TIER</th>
-              <th style="text-align:right">Qs</th>
-              <th style="text-align:right">SCORE</th>
-            </tr>
-          </thead>
-          <tbody id="lbBody">
-            <tr><td colspan="6" class="lb-empty">No scores yet — be the first!</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <button class="btn btn-outline" onclick="showScreen('screenConnect')">← BACK</button>
   </div>
 
 </div><!-- /app -->
@@ -1231,8 +1165,8 @@ const RITUAL_CHAIN_PARAMS = {
   chainId: RITUAL_CHAIN_HEX,
   chainName: 'Ritual',
   nativeCurrency: { name: 'RITUAL', symbol: 'RITUAL', decimals: 18 },
-  rpcUrls: ['https://rpc.ritualfoundation.org/'],
-  blockExplorerUrls: ['https://explorer.ritualfoundation.org/']
+  rpcUrls: ['http://rpc.ritualfoundation.org/'],
+  blockExplorerUrls: ['http://explorer.ritualfoundation.org/']
 };
 
 // Minimal ABI — only the functions we call
@@ -1241,9 +1175,7 @@ const CONTRACT_ABI = [
   "function submitScore(uint256 score, uint32 questionsAnswered, uint32 bestStreak, uint8 tierReached, uint8 multiplierX10) external",
   "function abandonSession() external",
   "function activeSession(address) external view returns (uint64)",
-  "function getPlayerStats(address) external view returns (tuple(uint64,uint64,uint256,uint256,uint32,uint32,uint8,uint256,uint256,uint256))",
-  "event ScoreSubmitted(address indexed player, uint64 indexed globalId, uint256 score, uint32 questionsAnswered, uint32 bestStreak, uint8 tierReached, uint8 multiplierX10, uint256 timestamp)",
-  "event SessionRegistered(address indexed player, uint64 indexed globalId, string discordName, uint256 fee, uint256 timestamp)"
+  "function getPlayerStats(address) external view returns (tuple(uint64,uint64,uint256,uint256,uint32,uint32,uint8,uint256,uint256,uint256))"
 ];
 
 let provider, signer, userAddress, discordName, contract;
@@ -1886,145 +1818,6 @@ function resetApp() {
   showScreen('screenConnect');
 }
 
-// ════════════════════════════════════════════════════════
-// LEADERBOARD — reads directly from Ritual blockchain
-// No localStorage. Visible to everyone on every device.
-// ════════════════════════════════════════════════════════
-
-const TIERS_LIST = ['WARM-UP','EASY','MODERATE','STEADY','CHALLENGING','TOUGH','HARD','INTENSE','BRUTAL','EXTREME'];
-
-// Cache so leaderboard doesn't twitch on refresh — only updates if data changes
-let lbCache = [];
-let lbLastBlock = 0;
-
-// Block your contract was deployed at — get this from the explorer
-// http://explorer.ritualfoundation.org/address/0x2645FdCE9e7Cf803f396782110b0f93a54e3C876
-const CONTRACT_DEPLOY_BLOCK = 1; // UPDATE THIS after checking explorer
-
-async function fetchOnChainLeaderboard() {
-  if (!window.ethereum) {
-    throw new Error('MetaMask not installed');
-  }
-
-  // Must use MetaMask provider — Ritual RPC blocks eth_getLogs from browser fetch
-  const readProvider = new ethers.providers.Web3Provider(window.ethereum, 'any');
-  const readContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, readProvider);
-
-  // Check latest block — skip full fetch if nothing new
-  const latest = await readProvider.getBlockNumber();
-  if (lbCache.length > 0 && latest <= lbLastBlock) {
-    return lbCache;
-  }
-
-  // Use deploy block not 0 — reduces query size and avoids RPC timeouts
-  const [scoreEvents, registerEvents] = await Promise.all([
-    readContract.queryFilter(readContract.filters.ScoreSubmitted(), CONTRACT_DEPLOY_BLOCK, 'latest'),
-    readContract.queryFilter(readContract.filters.SessionRegistered(), CONTRACT_DEPLOY_BLOCK, 'latest')
-  ]);
-
-  // First ever name per wallet — lowest block number wins
-  const nameMap = {};
-  for (const ev of registerEvents) {
-    const addr = ev.args.player.toLowerCase();
-    const existing = nameMap[addr];
-    if (!existing || ev.blockNumber < existing.blockNumber) {
-      nameMap[addr] = { name: ev.args.discordName, blockNumber: ev.blockNumber };
-    }
-  }
-  for (const addr in nameMap) nameMap[addr] = nameMap[addr].name;
-
-  // Most recent score per wallet — highest block number wins
-  const scoreMap = {};
-  for (const ev of scoreEvents) {
-    const addr = ev.args.player.toLowerCase();
-    const existing = scoreMap[addr];
-    if (!existing || ev.blockNumber > existing.blockNumber) {
-      scoreMap[addr] = {
-        address:   ev.args.player,
-        name:      nameMap[addr] || '—',
-        score:     ev.args.score.toNumber(),
-        questions: ev.args.questionsAnswered,
-        streak:    ev.args.bestStreak,
-        tier:      TIERS_LIST[Math.min(ev.args.tierReached, 9)] || 'WARM-UP',
-        blockNumber: ev.blockNumber
-      };
-    }
-  }
-
-  lbCache = Object.values(scoreMap).sort((a, b) => b.score - a.score).slice(0, 100);
-  lbLastBlock = latest;
-  return lbCache;
-}
-
-let lbRefreshInterval = null;
-
-async function renderLeaderboard() {
-  const tbody   = document.getElementById('lbBody');
-  const lbCount = document.getElementById('lbCount');
-
-  // Only show spinner on very first load — never flash on auto-refresh
-  const isFirstLoad = !tbody.dataset.loaded;
-  if (isFirstLoad) {
-    tbody.innerHTML = '<tr><td colspan="6" class="lb-empty">⏳ Loading scores from chain...</td></tr>';
-    lbCount.textContent = 'fetching...';
-  }
-
-  try {
-    const board = await fetchOnChainLeaderboard();
-    tbody.dataset.loaded = 'true';
-    lbCount.textContent = board.length + ' player' + (board.length !== 1 ? 's' : '') + ' · live';
-
-    if (board.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="lb-empty">No scores yet — be the first!</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = board.map((e, i) => {
-      const isYou      = userAddress && e.address.toLowerCase() === userAddress.toLowerCase();
-      const rankClass  = i === 0 ? 'lb-rank gold' : i === 1 ? 'lb-rank silver' : i === 2 ? 'lb-rank bronze' : 'lb-rank';
-      const rankSymbol = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1);
-      const addr       = e.address.slice(0, 6) + '...' + e.address.slice(-4);
-      const youTag     = isYou ? ' <span style="color:var(--ga);font-size:0.6rem">(YOU)</span>' : '';
-      return `<tr class="${isYou ? 'lb-you' : ''}">
-        <td class="${rankClass}">${rankSymbol}</td>
-        <td><strong>${escHtml(e.name)}</strong>${youTag}</td>
-        <td class="lb-addr">${addr}</td>
-        <td><span class="lb-tier">${escHtml(e.tier)}</span></td>
-        <td style="text-align:right;color:rgba(94,255,106,0.7);font-size:0.75rem">${e.questions || 0}</td>
-        <td class="lb-score">${e.score.toLocaleString()}</td>
-      </tr>`;
-    }).join('');
-
-  } catch(err) {
-    console.error('Leaderboard fetch error:', err);
-    if (!tbody.dataset.loaded) {
-      tbody.innerHTML = '<tr><td colspan="6" class="lb-empty" style="color:#ff7777">⚠ Please connect your wallet first to view the leaderboard.</td></tr>';
-      lbCount.textContent = 'error';
-    }
-  }
-}
-
-function openLeaderboard() {
-  const tbody = document.getElementById('lbBody');
-  delete tbody.dataset.loaded;
-  showScreen('screenLeaderboard');
-  renderLeaderboard();
-
-  clearInterval(lbRefreshInterval);
-  lbRefreshInterval = setInterval(() => {
-    if (document.getElementById('screenLeaderboard').classList.contains('active')) {
-      renderLeaderboard();
-    } else {
-      clearInterval(lbRefreshInterval);
-    }
-  }, 30000);
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ════════════════════════════════════════════════════════
 // Auto-start music on first interaction
 document.body.addEventListener('click', () => {
   if (!audioCtx) initAudio();
