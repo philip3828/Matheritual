@@ -1898,79 +1898,53 @@ let lbCache = [];
 let lbLastBlock = 0;
 
 async function fetchOnChainLeaderboard() {
-  const rpcUrl = 'https://rpc.ritualfoundation.org/';
+  // Use ethers.js read-only provider — handles CORS and RPC properly
+  const readProvider = new ethers.providers.JsonRpcProvider('https://rpc.ritualfoundation.org');
+  const readContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, readProvider);
 
-  async function rpcCall(method, params) {
-    const res = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
-    });
-    const json = await res.json();
-    if (json.error) throw new Error(json.error.message);
-    return json.result;
-  }
-
-  // Check latest block — if nothing new since last fetch, return cache
-  const latestHex = await rpcCall('eth_blockNumber', []);
-  const latest = parseInt(latestHex, 16);
+  // Check latest block — skip full fetch if nothing new
+  const latest = await readProvider.getBlockNumber();
   if (lbCache.length > 0 && latest <= lbLastBlock) {
-    return lbCache; // No new blocks — return cached data, no twitch
+    return lbCache;
   }
 
-  const SCORE_TOPIC = ethers.utils.id('ScoreSubmitted(address,uint64,uint256,uint32,uint32,uint8,uint8,uint256)');
-  const REG_TOPIC   = ethers.utils.id('SessionRegistered(address,uint64,string,uint256,uint256)');
-
-  // Always query from block 0 — nobody disappears ever
-  const [scoreLogs, regLogs] = await Promise.all([
-    rpcCall('eth_getLogs', [{ fromBlock: '0x0', toBlock: 'latest', address: CONTRACT_ADDRESS, topics: [SCORE_TOPIC] }]),
-    rpcCall('eth_getLogs', [{ fromBlock: '0x0', toBlock: 'latest', address: CONTRACT_ADDRESS, topics: [REG_TOPIC] }])
+  // Query all events from block 0 — nobody ever disappears
+  const [scoreEvents, registerEvents] = await Promise.all([
+    readContract.queryFilter(readContract.filters.ScoreSubmitted(), 0, 'latest'),
+    readContract.queryFilter(readContract.filters.SessionRegistered(), 0, 'latest')
   ]);
 
-  const iface = new ethers.utils.Interface(CONTRACT_ABI);
-
-  // Build name map — first ever registration wins (lowest block number)
+  // First ever name per wallet — lowest block number wins
   const nameMap = {};
-  for (const log of regLogs) {
-    try {
-      const parsed = iface.parseLog(log);
-      const addr = parsed.args.player.toLowerCase();
-      const bn = parseInt(log.blockNumber, 16);
-      if (!nameMap[addr] || bn < nameMap[addr].blockNumber) {
-        nameMap[addr] = { name: parsed.args.discordName, blockNumber: bn };
-      }
-    } catch(e) {}
+  for (const ev of registerEvents) {
+    const addr = ev.args.player.toLowerCase();
+    const existing = nameMap[addr];
+    if (!existing || ev.blockNumber < existing.blockNumber) {
+      nameMap[addr] = { name: ev.args.discordName, blockNumber: ev.blockNumber };
+    }
   }
   for (const addr in nameMap) nameMap[addr] = nameMap[addr].name;
 
-  // Build score map — most recent score per wallet (highest block number)
+  // Most recent score per wallet — highest block number wins
   const scoreMap = {};
-  for (const log of scoreLogs) {
-    try {
-      const parsed = iface.parseLog(log);
-      const addr = parsed.args.player.toLowerCase();
-      const bn = parseInt(log.blockNumber, 16);
-      const existing = scoreMap[addr];
-      if (!existing || bn > existing.blockNumber) {
-        // Only show name — never fall back to wallet address
-        const displayName = nameMap[addr] || '—';
-        scoreMap[addr] = {
-          address:   parsed.args.player,
-          name:      displayName,
-          score:     parsed.args.score.toNumber(),
-          questions: parsed.args.questionsAnswered,
-          streak:    parsed.args.bestStreak,
-          tier:      TIERS_LIST[Math.min(parsed.args.tierReached, 9)] || 'WARM-UP',
-          blockNumber: bn
-        };
-      }
-    } catch(e) {}
+  for (const ev of scoreEvents) {
+    const addr = ev.args.player.toLowerCase();
+    const existing = scoreMap[addr];
+    if (!existing || ev.blockNumber > existing.blockNumber) {
+      scoreMap[addr] = {
+        address:   ev.args.player,
+        name:      nameMap[addr] || '—',
+        score:     ev.args.score.toNumber(),
+        questions: ev.args.questionsAnswered,
+        streak:    ev.args.bestStreak,
+        tier:      TIERS_LIST[Math.min(ev.args.tierReached, 9)] || 'WARM-UP',
+        blockNumber: ev.blockNumber
+      };
+    }
   }
 
-  // Update cache and last known block
   lbCache = Object.values(scoreMap).sort((a, b) => b.score - a.score).slice(0, 100);
   lbLastBlock = latest;
-
   return lbCache;
 }
 
