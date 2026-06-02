@@ -1231,8 +1231,8 @@ const RITUAL_CHAIN_PARAMS = {
   chainId: RITUAL_CHAIN_HEX,
   chainName: 'Ritual',
   nativeCurrency: { name: 'RITUAL', symbol: 'RITUAL', decimals: 18 },
-  rpcUrls: ['http://rpc.ritualfoundation.org/'],
-  blockExplorerUrls: ['http://explorer.ritualfoundation.org/']
+  rpcUrls: ['https://rpc.ritualfoundation.org/'],
+  blockExplorerUrls: ['https://explorer.ritualfoundation.org/']
 };
 
 // Minimal ABI — only the functions we call
@@ -1894,7 +1894,7 @@ function resetApp() {
 const TIERS_LIST = ['WARM-UP','EASY','MODERATE','STEADY','CHALLENGING','TOUGH','HARD','INTENSE','BRUTAL','EXTREME'];
 
 function getReadProvider() {
-  return new ethers.providers.JsonRpcProvider('http://rpc.ritualfoundation.org/');
+  return new ethers.providers.JsonRpcProvider('https://rpc.ritualfoundation.org/');
 }
 
 async function fetchOnChainLeaderboard() {
