@@ -1906,6 +1906,13 @@ loadLeaderboard();
 document.body.addEventListener('click', () => {
   if (!audioCtx) initAudio();
 }, { once: true });
+
+// Keep Supabase alive — pings every 4 days
+setInterval(() => {
+  fetch(`${SUPABASE_URL}/rest/v1/leaderboard?limit=1`, {
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+  });
+}, 1000 * 60 * 60 * 24 * 4); // every 4 days
 </script>
 </body>
 </html>
