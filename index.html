@@ -1783,13 +1783,13 @@ async function saveOnChain() {
       : discordName;
 
     // Save to Supabase — wallet is primary key so score always overwrites
-    await fetch(`${SUPABASE_URL}/rest/v1/leaderboard`, {
+    await fetch(`${SUPABASE_URL}/rest/v1/leaderboard?on_conflict=wallet`, {
       method: 'POST',
       headers: {
         'apikey': SUPABASE_KEY,
         'Authorization': 'Bearer ' + SUPABASE_KEY,
         'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates'
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
       },
       body: JSON.stringify({
         wallet:      userAddress.toLowerCase(),
